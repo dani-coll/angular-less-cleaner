@@ -1,33 +1,70 @@
-'use strict';
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
+'use strict'
 import * as vscode from 'vscode'
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
+const jsdom = require("jsdom")
+const { JSDOM } = jsdom
+
+// The extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
-    // Use the console to output diagnostic information (console.log) and errors (console.error)
-    // This line of code will only be executed once when your extension is activated
-    console.log('Congratulations, your extension "angular-less-cleaner" is now active!')
+    console.log('angular-less-cleaner is now active')
 
-    // The command has been defined in the package.json file
-    // Now provide the implementation of the command with  registerCommand
-    // The commandId parameter must match the command field in package.json
+    let excludedFolders : string = '**/node_modules/**'
+    let startPosition: vscode.Position = new vscode.Position(0, 0)
+    let htmlDoms: any[] = []
+    vscode.workspace.findFiles('**/*.html', excludedFolders)
+    .then( (uris: vscode.Uri[]) =>{
+        if(!uris.length) {
+            vscode.window.showInformationMessage('No html files found')
+            return
+        }
+        let promises: Thenable<vscode.TextDocument>[] = []
+        uris.forEach( (uri: vscode.Uri) => {
+            let promise =  vscode.workspace.openTextDocument(uri)
+            promises.push(promise)
+            Promise.all(promises)
+            .then( (docs: vscode.TextDocument[]) => {
+                docs.forEach( (doc) => {
+                    let endPosition: vscode.Position = new vscode.Position(doc.lineCount, 0)
+                    let fullRange: vscode.Range = new vscode.Range(startPosition, endPosition)
+                    let dom = new JSDOM(doc.getText(fullRange))
+                    htmlDoms.push(dom)
+                })
+            })
+        })
+    })
+
+    vscode.languages.registerHoverProvider('less', {
+        provideHover(document, position, token) {
+            return new vscode.Hover('I am a hover!')
+        }
+    });
+
     let disposable = vscode.commands.registerCommand('extension.sayHello', () => {
         // The code you place here will be executed every time your command is executed
         let editor = vscode.window.activeTextEditor
         if (!editor) return
         let document = editor.document
-        let startPosition: vscode.Position = new vscode.Position(0, 0)
+       
         let endPosition: vscode.Position = new vscode.Position(document.lineCount, 0)
+        
+        
+        let snipet: vscode.SnippetString = new vscode.SnippetString("siiuu")
+        let decoration = vscode.window.createTextEditorDecorationType({backgroundColor: 'yellow'})
+        let secondPosition: vscode.Position = new vscode.Position(0, 10)
+        let range: vscode.Range = new vscode.Range(startPosition, secondPosition)
+        let ranges: vscode.Range[] = []
+        ranges.push(range)
+        editor.setDecorations(decoration,ranges)
+
+
+
         let fullRange : vscode.Range  = new vscode.Range(startPosition, endPosition)
-        let excludedFolders : string = '**/node_modules/**'
         let editorText: string = document.getText(fullRange)
         let previousIndex = 0
         while(editorText.length > 0) {
             let braceIndex = editorText.search(/{/)
-            if(braceIndex === -1) breakç
+            if(braceIndex === -1) break
             let previousInfo = editorText.substring(previousIndex, braceIndex)
             editorText = editorText.substring(braceIndex)
             let sPreviousInfo = previousInfo.lastIndexOf(';')
@@ -62,22 +99,6 @@ export function activate(context: vscode.ExtensionContext) {
             if(closeBrace === -1) break
             editorText = editorText.substring(closeBrace + 1)
         }
-
-        vscode.workspace.findFiles('**/*.html', excludedFolders)
-        .then( (uris: vscode.Uri[]) =>{
-            if(!uris.length) {
-                vscode.window.showInformationMessage('No html files found')
-                return
-            }
-            vscode.workspace.openTextDocument(uris[0])
-            .then( (doc: vscode.TextDocument) => {
-                let endPosition: vscode.Position = new vscode.Position(doc.lineCount, 0)
-                let fullRange  = new vscode.Range(startPosition, endPosition)
-                let text = doc.getText(fullRange)
-                vscode.window.showInformationMessage('Selected characters: ' + text)
-
-            })
-        })
     });
 
     context.subscriptions.push(disposable)
