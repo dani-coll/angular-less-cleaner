@@ -1,19 +1,109 @@
 'use strict'
 import * as vscode from 'vscode'
+import {LessElement, ElementType} from './models/less-element'
 
 const jsdom = require("jsdom")
 const { JSDOM } = jsdom
 
+
+
+function getElement(elementDeclaration: string, parent?: LessElement): LessElement {
+    let child: LessElement = new LessElement()
+    child.parent = parent
+    child.fullName = elementDeclaration
+    elementDeclaration = ignoreDetails(elementDeclaration)
+    child.name = elementDeclaration
+    if(elementDeclaration.length) {
+        if(elementDeclaration[0] === "#") child.type = ElementType.Id
+        else if(elementDeclaration[0] === "*") child.type = ElementType.All
+        else if(elementDeclaration[0] === ".") child.type = ElementType.Class
+        else child.type = ElementType.Tag
+    }
+    return child
+}
+
+function getMainElementTree(text : string): [LessElement[], string] {
+    let elements: LessElement[] = []
+    let balance: number = -1 //the text has already removed the first {
+    let openBraceIndex: number = -1
+    let closeBraceIndex: number = -1
+    let elementDeclaration: string
+    text = removeTrash(text)
+    elementDeclaration = text.substring(0, text.indexOf('{'))
+    let siblingElementDeclarations : string[] = elementDeclaration.split(',')
+    let siblingElements : LessElement[] = []
+    siblingElementDeclarations.forEach(e => {
+        siblingElements.push(getElement(e, undefined))
+    })
+    if(siblingElements.length) {
+        let currentParent: LessElement | undefined = siblingElements[0]
+        text = text.substring(text.indexOf('{') + 1)
+
+        while(balance !== 0) {
+            openBraceIndex = text.indexOf('{')
+            closeBraceIndex = text.indexOf('}')
+            if(closeBraceIndex === -1) break
+            if(openBraceIndex !== -1 && openBraceIndex < closeBraceIndex) {
+                --balance
+                elementDeclaration = text.substring(0, text.indexOf('{'))
+                elementDeclaration = ignoreStyles(elementDeclaration)
+                let childSiblingElements : string[] = elementDeclaration.split(',')
+                childSiblingElements.forEach( e => {
+                    currentParent!.children.push(getElement(e, currentParent))
+                })
+                if(currentParent!.children.length) currentParent = currentParent!.children[0]
+
+                text = text.substring(openBraceIndex + 1)
+            } else {
+                ++balance
+                text = text.substring(closeBraceIndex + 1)
+                currentParent = currentParent!.parent
+            }
+        }
+
+        for(let i = 0; i < siblingElements.length; ++i) {
+
+            if(i > 0) {
+                siblingElements[i].children = siblingElements[0].children
+            }
+            elements.push(siblingElements[i])
+        }
+    }
+    return [elements, text]
+}
+
+function ignoreDetails(text: string): string {
+    text = text.replace(/(\[[^]+\])/ig, '') //Ignore attributes
+    return text.replace(/(:[^]+)/ig, '') //Ignore semiclass
+}
+
+function ignoreStyles(text: string) : string {
+    let lastStyleIndex = text.lastIndexOf(';') //ignore styles
+    let openBraceIndex = text.indexOf('{') //ignore styles
+    if(openBraceIndex === -1 || openBraceIndex > lastStyleIndex) text = text.substring(lastStyleIndex + 1)
+    return text
+}
+
+//Replace comments and spaces
+//TODO make it work for /* */ after the css element
+function removeTrash(text: string) {
+    text = ignoreStyles(text)
+    text = text.replace(/(\/\*[^]+\*\/)/ig, '') 
+    text = text.replace(/(\/\/[^]+\n)/ig, '')
+    text = text.replace(/\n/g, '')
+    text = text.replace(/\s/g, '')
+    text = text.replace(/\r/g, '')
+    return text = text.replace(/ /g, '')
+}
+
 // The extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-
-    console.log('angular-less-cleaner is now active')
 
     let excludedFolders : string = '**/node_modules/**'
     let startPosition: vscode.Position = new vscode.Position(0, 0)
     let htmlDoms: any[] = []
     vscode.workspace.findFiles('**/*.html', excludedFolders)
-    .then( (uris: vscode.Uri[]) =>{
+    .then( (uris: vscode.Uri[]) => {
         if(!uris.length) {
             vscode.window.showInformationMessage('No html files found')
             return
@@ -38,7 +128,7 @@ export function activate(context: vscode.ExtensionContext) {
         provideHover(document, position, token) {
             return new vscode.Hover('I am a hover!')
         }
-    });
+    })
 
     let disposable = vscode.commands.registerCommand('extension.sayHello', () => {
         // The code you place here will be executed every time your command is executed
@@ -49,7 +139,6 @@ export function activate(context: vscode.ExtensionContext) {
         let endPosition: vscode.Position = new vscode.Position(document.lineCount, 0)
         
         
-        let snipet: vscode.SnippetString = new vscode.SnippetString("siiuu")
         let decoration = vscode.window.createTextEditorDecorationType({backgroundColor: 'yellow'})
         let secondPosition: vscode.Position = new vscode.Position(0, 10)
         let range: vscode.Range = new vscode.Range(startPosition, secondPosition)
@@ -57,49 +146,19 @@ export function activate(context: vscode.ExtensionContext) {
         ranges.push(range)
         editor.setDecorations(decoration,ranges)
 
-
-
         let fullRange : vscode.Range  = new vscode.Range(startPosition, endPosition)
         let editorText: string = document.getText(fullRange)
-        let previousIndex = 0
+        let lessElements: LessElement[] = []
         while(editorText.length > 0) {
             let braceIndex = editorText.search(/{/)
             if(braceIndex === -1) break
-            let previousInfo = editorText.substring(previousIndex, braceIndex)
-            editorText = editorText.substring(braceIndex)
-            let sPreviousInfo = previousInfo.lastIndexOf(';')
-            if(sPreviousInfo !== -1 ) previousInfo = previousInfo.substring(sPreviousInfo + 1)
-
-            //Replace comments and spaces
-            //TODO make it work for /* */ after the css element
-            previousInfo = previousInfo.replace(/(\/\*[^]+\*\/)/ig, '') 
-
-            previousInfo = previousInfo.replace(/(\/\/[^]+\n)/ig, '')
-            previousInfo = previousInfo.replace(/ /g, '')
-            previousInfo = previousInfo.replace(/\n/g, '')
-            let cssElements : string[] = previousInfo.split(',')
-            cssElements.forEach( element => {
-                element = element.replace(/(\[[^]+\])/ig, '') //Ignore attributes
-                element = element.replace(/(:[^]+)/ig, '') //Ignore semiclass
-                if(element.length && element != '*') {
-                    let isIdentifier = element[0] == '#'
-                    let isClass = element[0] == '.'
-                    let isElement = !isClass && !isIdentifier
-
-                    console.log('busca a la dom')
-                }
-            })
-            console.log(previousInfo)
-            let closeBrace = editorText.search(/}/)
-            let openBrace = editorText.search(/{/)
-            if(openBrace < closeBrace) //it has inner elements
-            {
-                
-            }
-            if(closeBrace === -1) break
-            editorText = editorText.substring(closeBrace + 1)
+            
+            let mainElementTreeResponse = getMainElementTree(editorText)
+            lessElements = lessElements.concat(mainElementTreeResponse[0])
+            editorText = mainElementTreeResponse[1]
         }
-    });
+        console.log(lessElements)
+    })
 
     context.subscriptions.push(disposable)
 }
