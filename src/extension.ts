@@ -1,122 +1,10 @@
 'use strict'
 import * as vscode from 'vscode'
-import {LessElement, ElementType} from './models/less-element'
+import {LessElement} from './models/less-element'
+import * as less2Object from './less2object'
 
 const jsdom = require("jsdom")
 const { JSDOM } = jsdom
-let lines: number
-
-function getElement(elementDeclaration: string, parent?: LessElement): LessElement {
-    let child: LessElement = new LessElement()
-    child.parent = parent
-    child.startRow = lines
-    child.fullName = elementDeclaration
-    elementDeclaration = ignoreDetails(elementDeclaration)
-    child.name = elementDeclaration
-    if(elementDeclaration.length) {
-        if(elementDeclaration[0] === "#") child.type = ElementType.Id
-        else if(elementDeclaration[0] === "*") child.type = ElementType.All
-        else if(elementDeclaration[0] === ".") child.type = ElementType.Class
-        else child.type = ElementType.Tag
-    }
-    return child
-}
-
-function updateCounters(substractedText: string) {
-    lines += (substractedText.match(/\n/g) || []).length
-}
-
-function getMainElementTree(text : string): [LessElement[], string] {
-    let elements: LessElement[] = []
-    let balance: number = -1 //the text has already removed the first {
-    let openBraceIndex: number = text.indexOf('{')
-    let closeBraceIndex: number = -1
-    let elementDeclaration: string
-    elementDeclaration = text.substring(0, openBraceIndex)
-    let siblingElementDeclarations : string[] = elementDeclaration.split(',')
-    let siblingElements : LessElement[] = []
-    let siblingRows: number = 0
-    siblingElementDeclarations.forEach(declaration => {
-        let cleanName = removeTrash(declaration)
-        let element: LessElement = getElement(cleanName)
-        siblingRows += (declaration.match(/\n/g) || []).length 
-        element.startRow = lines + siblingRows
-        if(siblingElements[0]) siblingElements[0].littleBrothers.push(element)
-        else siblingElements.push(element)
-    })
-    if(siblingElements.length) {
-        let currentParent: LessElement | undefined = siblingElements[0]
-        let limitIndex = text.indexOf('{') + 1
-        updateCounters(text.substring(0, limitIndex))
-        text = text.substring(limitIndex)
-
-        while(balance !== 0) {
-            openBraceIndex = text.indexOf('{')
-            closeBraceIndex = text.indexOf('}')
-            if(closeBraceIndex === -1) break
-            if(openBraceIndex !== -1 && openBraceIndex < closeBraceIndex) {
-                --balance
-                openBraceIndex = text.indexOf('{')
-                elementDeclaration = text.substring(0, openBraceIndex)
-                elementDeclaration = removeTrash(elementDeclaration)
-                elementDeclaration = ignoreStyles(elementDeclaration)
-
-                let childSiblingElements : string[] = elementDeclaration.split(',')
-                siblingRows = 0
-                for(let i = 0; i < childSiblingElements.length; ++i) {
-                    let element = getElement(childSiblingElements[i], currentParent)
-                    siblingRows += (childSiblingElements[i].match(/\n/g) || []).length
-                    element.startRow = lines + siblingRows
-                    if(i > 0) currentParent!.children[0].littleBrothers.push(element)
-                    else currentParent!.children.push(element)
-                }
-                if(currentParent!.children.length) currentParent = currentParent!.children[0]
-
-                updateCounters(text.substring(0, openBraceIndex + 1))
-                text = text.substring(openBraceIndex + 1)
-            } else {
-                ++balance
-                updateCounters(text.substring(0, closeBraceIndex + 1))
-                text = text.substring(closeBraceIndex + 1)
-                currentParent!.endRow = lines
-                currentParent = currentParent!.parent
-            }
-        }
-
-        for(let i = 0; i < siblingElements.length; ++i) {
-
-            if(i > 0) {
-                siblingElements[i].children = siblingElements[0].children
-            }
-            elements.push(siblingElements[i])
-        }
-    }
-    return [elements, text]
-}
-
-function ignoreDetails(text: string): string {
-    text = text.replace(/(\[[^]+\])/ig, '') //Ignore attributes
-    return text.replace(/(:[^]+)/ig, '') //Ignore semiclass
-}
-
-function ignoreStyles(text: string) : string {
-    let lastStyleIndex = text.lastIndexOf(';') //ignore styles
-    let openBraceIndex = text.indexOf('{') //ignore styles
-    if(openBraceIndex === -1 || openBraceIndex > lastStyleIndex) text = text.substring(lastStyleIndex + 1)
-    return text
-}
-
-//Replace comments and spaces
-//TODO make it work for /* */ after the css element
-function removeTrash(text: string) {
-    text = ignoreStyles(text)
-    text = text.replace(/(\/\*[^]+\*\/)/ig, '') 
-    text = text.replace(/(\/\/[^]+\n)/ig, '')
-    text = text.replace(/\n/g, '')
-    text = text.replace(/\s/g, '')
-    text = text.replace(/\r/g, '')
-    return text = text.replace(/ /g, '')
-}
 
 // The extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -170,16 +58,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         let fullRange : vscode.Range  = new vscode.Range(startPosition, endPosition)
         let editorText: string = document.getText(fullRange)
-        let lessElements: LessElement[] = []
-        lines = 1
-        while(editorText.length > 0) {
-            let braceIndex = editorText.search(/{/)
-            if(braceIndex === -1) break
-        
-            let mainElementTreeResponse = getMainElementTree(editorText)
-            lessElements = lessElements.concat(mainElementTreeResponse[0])
-            editorText = mainElementTreeResponse[1]
-        }
+        let lessElements: LessElement[] = less2Object.getLessObjects(editorText)
         
         console.log(lessElements)
     })
