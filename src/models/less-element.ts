@@ -9,7 +9,6 @@ export enum ElementType {
 
 export class LessElement {
 	constructor(
-        public id: number = -1,
         public name: string = "",
         public fullName: string = "",
         public type: ElementType = ElementType.Undefined,
@@ -18,8 +17,8 @@ export class LessElement {
         public startColumn: number = -1,
         public endRow: number = -1,
         public endColumn: number = -1,
-        public parent: LessElement | undefined = undefined
-	) {
-        id = 1
-    }
+        public parent: LessElement | undefined = undefined,
+        public bigBrother: LessElement | undefined = undefined,
+
+	) {}
 }

@@ -4,12 +4,12 @@ import {LessElement, ElementType} from './models/less-element'
 
 const jsdom = require("jsdom")
 const { JSDOM } = jsdom
-
-
+let lines: number
 
 function getElement(elementDeclaration: string, parent?: LessElement): LessElement {
     let child: LessElement = new LessElement()
     child.parent = parent
+    child.startRow = lines
     child.fullName = elementDeclaration
     elementDeclaration = ignoreDetails(elementDeclaration)
     child.name = elementDeclaration
@@ -22,22 +22,32 @@ function getElement(elementDeclaration: string, parent?: LessElement): LessEleme
     return child
 }
 
+function updateCounters(substractedText: string) {
+    lines += (substractedText.match(/\n/g) || []).length
+}
+
 function getMainElementTree(text : string): [LessElement[], string] {
     let elements: LessElement[] = []
     let balance: number = -1 //the text has already removed the first {
-    let openBraceIndex: number = -1
+    let openBraceIndex: number = text.indexOf('{')
     let closeBraceIndex: number = -1
     let elementDeclaration: string
-    text = removeTrash(text)
-    elementDeclaration = text.substring(0, text.indexOf('{'))
+    elementDeclaration = text.substring(0, openBraceIndex)
     let siblingElementDeclarations : string[] = elementDeclaration.split(',')
     let siblingElements : LessElement[] = []
-    siblingElementDeclarations.forEach(e => {
-        siblingElements.push(getElement(e, undefined))
+    let siblingRows: number = 0
+    siblingElementDeclarations.forEach(declaration => {
+        let cleanName = removeTrash(declaration)
+        let element: LessElement = getElement(cleanName)
+        siblingRows += (declaration.match(/\n/g) || []).length 
+        element.startRow = lines + siblingRows
+        siblingElements.push(element)
     })
     if(siblingElements.length) {
         let currentParent: LessElement | undefined = siblingElements[0]
-        text = text.substring(text.indexOf('{') + 1)
+        let limitIndex = text.indexOf('{') + 1
+        updateCounters(text.substring(0, limitIndex))
+        text = text.substring(limitIndex)
 
         while(balance !== 0) {
             openBraceIndex = text.indexOf('{')
@@ -45,18 +55,28 @@ function getMainElementTree(text : string): [LessElement[], string] {
             if(closeBraceIndex === -1) break
             if(openBraceIndex !== -1 && openBraceIndex < closeBraceIndex) {
                 --balance
-                elementDeclaration = text.substring(0, text.indexOf('{'))
+                openBraceIndex = text.indexOf('{')
+                elementDeclaration = text.substring(0, openBraceIndex)
+                elementDeclaration = removeTrash(elementDeclaration)
                 elementDeclaration = ignoreStyles(elementDeclaration)
+
                 let childSiblingElements : string[] = elementDeclaration.split(',')
-                childSiblingElements.forEach( e => {
-                    currentParent!.children.push(getElement(e, currentParent))
+                siblingRows = 0
+                childSiblingElements.forEach( declaration => {
+                    let element = getElement(declaration, currentParent)
+                    siblingRows += (declaration.match(/\n/g) || []).length
+                    element.startRow = lines + siblingRows
+                    currentParent!.children.push(element)
                 })
                 if(currentParent!.children.length) currentParent = currentParent!.children[0]
 
+                updateCounters(text.substring(0, openBraceIndex + 1))
                 text = text.substring(openBraceIndex + 1)
             } else {
                 ++balance
+                updateCounters(text.substring(0, closeBraceIndex + 1))
                 text = text.substring(closeBraceIndex + 1)
+                currentParent!.endRow = lines
                 currentParent = currentParent!.parent
             }
         }
@@ -149,14 +169,16 @@ export function activate(context: vscode.ExtensionContext) {
         let fullRange : vscode.Range  = new vscode.Range(startPosition, endPosition)
         let editorText: string = document.getText(fullRange)
         let lessElements: LessElement[] = []
+        lines = 1
         while(editorText.length > 0) {
             let braceIndex = editorText.search(/{/)
             if(braceIndex === -1) break
-            
+        
             let mainElementTreeResponse = getMainElementTree(editorText)
             lessElements = lessElements.concat(mainElementTreeResponse[0])
             editorText = mainElementTreeResponse[1]
         }
+        
         console.log(lessElements)
     })
 
