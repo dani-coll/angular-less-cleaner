@@ -18,7 +18,7 @@ export class LessElement {
         public endRow: number = -1,
         public endColumn: number = -1,
         public parent: LessElement | undefined = undefined,
-        public bigBrother: LessElement | undefined = undefined,
+        public littleBrothers: LessElement[] = [],
 
 	) {}
 }

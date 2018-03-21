@@ -41,7 +41,8 @@ function getMainElementTree(text : string): [LessElement[], string] {
         let element: LessElement = getElement(cleanName)
         siblingRows += (declaration.match(/\n/g) || []).length 
         element.startRow = lines + siblingRows
-        siblingElements.push(element)
+        if(siblingElements[0]) siblingElements[0].littleBrothers.push(element)
+        else siblingElements.push(element)
     })
     if(siblingElements.length) {
         let currentParent: LessElement | undefined = siblingElements[0]
@@ -62,12 +63,13 @@ function getMainElementTree(text : string): [LessElement[], string] {
 
                 let childSiblingElements : string[] = elementDeclaration.split(',')
                 siblingRows = 0
-                childSiblingElements.forEach( declaration => {
-                    let element = getElement(declaration, currentParent)
-                    siblingRows += (declaration.match(/\n/g) || []).length
+                for(let i = 0; i < childSiblingElements.length; ++i) {
+                    let element = getElement(childSiblingElements[i], currentParent)
+                    siblingRows += (childSiblingElements[i].match(/\n/g) || []).length
                     element.startRow = lines + siblingRows
-                    currentParent!.children.push(element)
-                })
+                    if(i > 0) currentParent!.children[0].littleBrothers.push(element)
+                    else currentParent!.children.push(element)
+                }
                 if(currentParent!.children.length) currentParent = currentParent!.children[0]
 
                 updateCounters(text.substring(0, openBraceIndex + 1))
