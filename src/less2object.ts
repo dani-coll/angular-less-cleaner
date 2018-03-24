@@ -70,7 +70,7 @@ function getMainElementTree(text : string): [LessElement[], string] {
                     if(i > 0) currentParent!.children[0].littleBrothers.push(element)
                     else currentParent!.children.push(element)
                 }
-                if(currentParent!.children.length) currentParent = currentParent!.children[0]
+                if(currentParent!.children.length) currentParent = currentParent!.children[currentParent!.children.length-1]
 
                 updateCounters(text.substring(0, openBraceIndex + 1))
                 text = text.substring(openBraceIndex + 1)

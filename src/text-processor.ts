@@ -3,6 +3,49 @@ export function ignoreDetails(text: string): string {
     return text.replace(/(:[^]+)/ig, '') //Ignore semiclass
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export function ignoreInnerStrings(text: string) {
+    text = text.replace(/('[^]+')/ig, "''")
+    text = text.replace(/(`[^]+`)/ig, '``')
+    return text.replace(/("[^]+")/ig, '""')
+}
+
 export function ignoreStyles(text: string) : string {
     let lastStyleIndex = text.lastIndexOf(';') //ignore styles
     let openBraceIndex = text.indexOf('{') //ignore styles
@@ -12,7 +55,7 @@ export function ignoreStyles(text: string) : string {
 
 //Replace comments and spaces
 //TODO make it work for /* */ after the css element
-export function removeTrash(text: string) {
+export function removeTrash(text: string): string {
     text = ignoreStyles(text)
     text = text.replace(/(\/\*[^]+\*\/)/ig, '') 
     text = text.replace(/(\/\/[^]+\n)/ig, '')
@@ -24,4 +67,8 @@ export function removeTrash(text: string) {
 
 export function getEndlinesCount(substractedText: string) : number {
     return (substractedText.match(/\n/g) || []).length
+}
+
+export function prepareJsonForParse(text: string) : string {
+    return text.replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2": ')
 }

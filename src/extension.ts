@@ -2,38 +2,14 @@
 import * as vscode from 'vscode'
 import {LessElement} from './models/less-element'
 import * as less2Object from './less2object'
-
-const jsdom = require("jsdom")
-const { JSDOM } = jsdom
+import * as htmlLoader from './html-loader'
+import * as angularLoader from './angular-loader'
 
 // The extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 
-    let excludedFolders : string = '**/node_modules/**'
-    let startPosition: vscode.Position = new vscode.Position(0, 0)
-    let htmlDoms: any[] = []
-    vscode.workspace.findFiles('**/*.html', excludedFolders)
-    .then( (uris: vscode.Uri[]) => {
-        if(!uris.length) {
-            vscode.window.showInformationMessage('No html files found')
-            return
-        }
-        let promises: Thenable<vscode.TextDocument>[] = []
-        uris.forEach( (uri: vscode.Uri) => {
-            let promise =  vscode.workspace.openTextDocument(uri)
-            promises.push(promise)
-            Promise.all(promises)
-            .then( (docs: vscode.TextDocument[]) => {
-                docs.forEach( (doc) => {
-                    let endPosition: vscode.Position = new vscode.Position(doc.lineCount, 0)
-                    let fullRange: vscode.Range = new vscode.Range(startPosition, endPosition)
-                    let dom = new JSDOM(doc.getText(fullRange))
-                    htmlDoms.push(dom)
-                })
-            })
-        })
-    })
-
+    let htmlDoms: any[] = await htmlLoader.getWorkspaceHtmlDoms()
+    await angularLoader.getWorkspaceAngularComponents()
     vscode.languages.registerHoverProvider('less', {
         provideHover(document, position, token) {
             return new vscode.Hover('I am a hover!')
@@ -50,6 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
         
         
         let decoration = vscode.window.createTextEditorDecorationType({backgroundColor: 'yellow'})
+        let startPosition: vscode.Position = new vscode.Position(0, 0)
         let secondPosition: vscode.Position = new vscode.Position(0, 10)
         let range: vscode.Range = new vscode.Range(startPosition, secondPosition)
         let ranges: vscode.Range[] = []

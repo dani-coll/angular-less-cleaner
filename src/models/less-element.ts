@@ -14,9 +14,7 @@ export class LessElement {
         public type: ElementType = ElementType.Undefined,
         public children: LessElement[] = [],
         public startRow: number = -1,
-        public startColumn: number = -1,
         public endRow: number = -1,
-        public endColumn: number = -1,
         public parent: LessElement | undefined = undefined,
         public littleBrothers: LessElement[] = [],
 
