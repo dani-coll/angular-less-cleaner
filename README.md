@@ -1,4 +1,4 @@
-# angular-less-cleaner README
+# angular-less-cleaner
 
 ## Features
 
