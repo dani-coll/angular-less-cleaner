@@ -41,16 +41,6 @@ export async function getWorkspaceAngularComponents() : Promise<any[]> {
     return angularComponents
     
 }
-export function getAngularInlineTemplates(angularComponents): any[] {
-    let inlineDoms: any[] = []
-    angularComponents.forEach( component => {
-        if(component.template) {
-            let dom = htmlLoader.loadHtml(component.template)
-            inlineDoms.push(dom)
-        }
-    })
-    return inlineDoms
-}
 
 export function getAngularTree(angularComponents : AngularComponent[], htmlDoms : HtmlDom[]) {
     
@@ -59,7 +49,7 @@ export function getAngularTree(angularComponents : AngularComponent[], htmlDoms 
 export function mapDomsToComponent(angularComponents : AngularComponent[], htmlDoms : HtmlDom[]) : AngularComponent[] {
     let bar = "\\" //TO DO linux/mac
     angularComponents.forEach( component => {
-        if(component.templateUrl && component.fullPath) {
+        if(component.templateUrl) {
             let splitPath = component.fullPath.split(bar)
             splitPath.pop()
 
@@ -79,6 +69,9 @@ export function mapDomsToComponent(angularComponents : AngularComponent[], htmlD
             let templatePath = templateSplitPath.join(bar)
             let componentDom: HtmlDom = htmlDoms.find(d => d.fullPath === templatePath) || new HtmlDom
             component.dom = componentDom
+        } else if(component.template) {
+            let dom = htmlLoader.loadDom(component.template)
+            component.dom = dom
         }
      })
      return angularComponents

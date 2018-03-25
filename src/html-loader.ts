@@ -29,7 +29,7 @@ export async function getWorkspaceHtmlDoms() : Promise<any[]> {
     return htmlDoms 
 }
 
-export function loadHtml(encodedTemplate: string) : any {
+export function loadDom(encodedTemplate: string) : any {
     let decodedTemplate = textProcessor.decodeTemplate(encodedTemplate)
     return new JSDOM(decodedTemplate)
 }
