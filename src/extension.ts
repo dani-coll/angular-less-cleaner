@@ -4,15 +4,16 @@ import {LessElement} from './models/less-element'
 import * as less2Object from './less2object'
 import * as htmlLoader from './html-loader'
 import * as angularLoader from './angular-loader'
+import {HtmlDom} from './models/html-dom'
 
 // The extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
 
-    let htmlDoms: any[] = await htmlLoader.getWorkspaceHtmlDoms()
+    let htmlDoms: HtmlDom[] = await htmlLoader.getWorkspaceHtmlDoms()
 
     let angularComponents = await angularLoader.getWorkspaceAngularComponents()
-    let inlineDoms = angularLoader.getAngularInlineTemplates(angularComponents)
-    htmlDoms = htmlDoms.concat(inlineDoms)
+    angularComponents = angularLoader.mapDomsToComponent(angularComponents, htmlDoms)
+
     /*
     vscode.languages.registerHoverProvider('less', {
         provideHover(document, position, token) {

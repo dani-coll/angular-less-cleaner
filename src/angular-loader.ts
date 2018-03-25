@@ -2,9 +2,11 @@ import * as vscode from 'vscode'
 import * as constants from './constants'
 import * as textProcessor from './text-processor'
 import * as htmlLoader from './html-loader'
+import {AngularComponent} from './models/angular-component'
+import { HtmlDom } from './models/html-dom'
 
 export async function getWorkspaceAngularComponents() : Promise<any[]> {
-    let angularComponents: any[] = []
+    let angularComponents: AngularComponent[] = []
     let uris: vscode.Uri[] = await vscode.workspace.findFiles('**/*.ts', constants.excludedFolders)
     if(!uris.length) {
         vscode.window.showInformationMessage('No ts files found')
@@ -30,7 +32,8 @@ export async function getWorkspaceAngularComponents() : Promise<any[]> {
             if(objectStartIndex !== -1 && objectEndIndex !== -1) {
                 componentString = componentString.substring(objectStartIndex, objectEndIndex + 1)
                 componentString = textProcessor.prepareJsonForParse(componentString)
-                let component = JSON.parse(componentString)
+                let component: AngularComponent = JSON.parse(componentString)
+                component.fullPath = doc.uri.fsPath
                 angularComponents.push(component)
             }
         }
@@ -47,4 +50,36 @@ export function getAngularInlineTemplates(angularComponents): any[] {
         }
     })
     return inlineDoms
+}
+
+export function getAngularTree(angularComponents : AngularComponent[], htmlDoms : HtmlDom[]) {
+    
+}
+
+export function mapDomsToComponent(angularComponents : AngularComponent[], htmlDoms : HtmlDom[]) : AngularComponent[] {
+    let bar = "\\" //TO DO linux/mac
+    angularComponents.forEach( component => {
+        if(component.templateUrl && component.fullPath) {
+            let splitPath = component.fullPath.split(bar)
+            splitPath.pop()
+
+            let templateSplitPath = component.templateUrl.split("/")
+            let firstGoBack = true
+            for(let i = 0; i < templateSplitPath.length; ++i) {
+               
+                if(templateSplitPath[i] == '..') {
+                    splitPath.pop()
+                    if(!firstGoBack) templateSplitPath[i] = ''
+                    firstGoBack = false
+                } 
+                else if(templateSplitPath[i] != '.') break
+            }
+            templateSplitPath = templateSplitPath.filter(p => p != '')
+            templateSplitPath[0] = splitPath.join(bar)
+            let templatePath = templateSplitPath.join(bar)
+            let componentDom: HtmlDom = htmlDoms.find(d => d.fullPath === templatePath) || new HtmlDom
+            component.dom = componentDom
+        }
+     })
+     return angularComponents
 }
