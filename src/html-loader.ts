@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import * as constants from './constants'
+import * as textProcessor from './text-processor'
 
 const jsdom = require("jsdom")
 const { JSDOM } = jsdom
@@ -23,6 +24,10 @@ export async function getWorkspaceHtmlDoms() : Promise<any[]> {
         let fullRange: vscode.Range = new vscode.Range(startPosition, endPosition)
         htmlDoms.push(new JSDOM(doc.getText(fullRange)))
     })
-    return htmlDoms
-    
+    return htmlDoms 
+}
+
+export function loadHtml(template: string) : any {
+    let decodedTemplate = textProcessor.decodeTemplate(template)
+    return new JSDOM(decodedTemplate)
 }

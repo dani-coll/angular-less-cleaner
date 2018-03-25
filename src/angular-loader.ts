@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import * as constants from './constants'
 import * as textProcessor from './text-processor'
+import * as htmlLoader from './html-loader'
 
 export async function getWorkspaceAngularComponents() : Promise<any[]> {
     let angularComponents: any[] = []
@@ -23,15 +24,27 @@ export async function getWorkspaceAngularComponents() : Promise<any[]> {
         let componentIndex = tsText.indexOf('@Component')
         if(componentIndex !== -1) {
             tsText = tsText.substring(componentIndex)
-            let componentString = textProcessor.ignoreInnerStrings(tsText)
+            let componentString = textProcessor.encodeTemplate(tsText)
             let objectStartIndex = componentString.indexOf('{')
-            let objectEndIndex = componentString.indexOf('}') + 1
-            componentString = componentString.substring(objectStartIndex, objectEndIndex)
-            componentString = textProcessor.prepareJsonForParse(componentString)
-            let component = JSON.parse(componentString)
-            angularComponents.push(component)
+            let objectEndIndex = componentString.indexOf('}')
+            if(objectStartIndex !== -1 && objectEndIndex !== -1) {
+                componentString = componentString.substring(objectStartIndex, objectEndIndex + 1)
+                componentString = textProcessor.prepareJsonForParse(componentString)
+                let component = JSON.parse(componentString)
+                angularComponents.push(component)
+            }
         }
     })
     return angularComponents
     
+}
+export function getAngularInlineTemplates(angularComponents): any[] {
+    let inlineDoms: any[] = []
+    angularComponents.forEach( component => {
+        if(component.template) {
+            let dom = htmlLoader.loadHtml(component.template)
+            inlineDoms.push(dom)
+        }
+    })
+    return inlineDoms
 }
